@@ -1,0 +1,205 @@
+import 'package:flutter/material.dart';
+
+void main() {
+  runApp(KriegsspielApp());
+}
+
+class KriegsspielApp extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Kriegsspiel Proto',
+      theme: ThemeData(primarySwatch: Colors.blue),
+      home: RoleSelectScreen(),
+    );
+  }
+}
+
+class RoleSelectScreen extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text('Kriegsspiel - Szerepválasztás')),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            ElevatedButton(
+              child: Text('Játékos 1'),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => GameScreen(role: "player1")),
+                );
+              },
+            ),
+            ElevatedButton(
+              child: Text('Játékos 2'),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => GameScreen(role: "player2")),
+                );
+              },
+            ),
+            ElevatedButton(
+              child: Text('Felügyelő (Umpire)'),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => GameScreen(role: "umpire")),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class GameScreen extends StatefulWidget {
+  final String role;
+
+  GameScreen({required this.role});
+
+  @override
+  State<GameScreen> createState() => _GameScreenState();
+}
+
+class Block {
+  final String type;
+  final Offset position;
+  final Color color;
+  Block({required this.type, required this.position, required this.color});
+}
+
+class _GameScreenState extends State<GameScreen> {
+  // Példa blokkok, később dinamikusan is lehet tölteni!
+  List<Block> blocks = [
+    Block(type: "gyalog", position: Offset(1, 1), color: Colors.blue),
+    Block(type: "lovas", position: Offset(2, 3), color: Colors.brown),
+    Block(type: "tüzér", position: Offset(4, 2), color: Colors.red),
+  ];
+
+  // TODO: Multiplayer, fog-of-war, szabályrendszer, chat, stb.
+
+  @override
+  Widget build(BuildContext context) {
+    String title;
+    if (widget.role == "umpire") {
+      title = "Felügyelő nézet";
+    } else if (widget.role == "player1") {
+      title = "Játékos 1 nézet";
+    } else {
+      title = "Játékos 2 nézet";
+    }
+
+    return Scaffold(
+      appBar: AppBar(title: Text(title)),
+      body: Center(
+        child: Column(
+          children: [
+            Expanded(
+              child: MapBoard(
+                blocks: blocks,
+                role: widget.role,
+                onBlockMoved: (index, newPosition) {
+                  setState(() {
+                    blocks[index] =
+                        Block(type: blocks[index].type, position: newPosition, color: blocks[index].color);
+                  });
+                },
+              ),
+            ),
+            // TODO: Parancsadás, kommunikáció, szabályok, stb.
+            if (widget.role == "umpire")
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Text("Felügyelő: minden blokk látható, mozgatás szabad."),
+              ),
+            if (widget.role != "umpire")
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Text("Csak a saját egységeid látszanak! (Fog-of-war fejlesztendő)"),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class MapBoard extends StatelessWidget {
+  final List<Block> blocks;
+  final String role;
+  final Function(int, Offset) onBlockMoved;
+
+  MapBoard({required this.blocks, required this.role, required this.onBlockMoved});
+
+  @override
+  Widget build(BuildContext context) {
+    double gridSize = 6;
+    double cellSize = 50.0;
+    return Container(
+      width: gridSize * cellSize,
+      height: gridSize * cellSize,
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.black),
+        color: Colors.green[100],
+      ),
+      child: Stack(
+        children: [
+          // Rács kirajzolása
+          for (int x = 0; x < gridSize; x++)
+            for (int y = 0; y < gridSize; y++)
+              Positioned(
+                left: x * cellSize,
+                top: y * cellSize,
+                child: Container(
+                  width: cellSize,
+                  height: cellSize,
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.black12),
+                  ),
+                ),
+              ),
+          // Blokkok kirajzolása
+          for (int i = 0; i < blocks.length; i++)
+            Positioned(
+              left: blocks[i].position.dx * cellSize,
+              top: blocks[i].position.dy * cellSize,
+              child: GestureDetector(
+                onPanUpdate: (details) {
+                  if (role == "umpire") {
+                    // Csak umpire mozgathatja szabadon
+                    Offset newPosition = Offset(
+                        ((blocks[i].position.dx * cellSize + details.delta.dx) / cellSize).clamp(0, gridSize - 1),
+                        ((blocks[i].position.dy * cellSize + details.delta.dy) / cellSize).clamp(0, gridSize - 1));
+                    onBlockMoved(i, Offset(newPosition.dx.roundToDouble(), newPosition.dy.roundToDouble()));
+                  }
+                },
+                child: Container(
+                  width: cellSize,
+                  height: cellSize,
+                  decoration: BoxDecoration(
+                    color: blocks[i].color,
+                    border: Border.all(color: Colors.black),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Center(
+                      child: Text(
+                    blocks[i].type.substring(0, 1).toUpperCase(),
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
+                  )),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
